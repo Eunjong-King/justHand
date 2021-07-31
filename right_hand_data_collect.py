@@ -50,8 +50,14 @@ with mp_hands.Hands(min_detection_confidence=0.5,
                     features = [distance_4_12, distance_16_20, "l"]
                     cv2.putText(image, "left click...", (0, 30), cv2.FONT_HERSHEY_PLAIN, 2, (0,0,255), thickness=3)
                     wr.writerow(features)
+                elif key_input == ord('z'):
+                    distance_4_12 = calculate_distance(hand_landmarks.landmark[12], hand_landmarks.landmark[4])
+                    distance_16_20 = calculate_distance(hand_landmarks.landmark[16], hand_landmarks.landmark[20])
+                    features = [distance_4_12, distance_16_20, "z"]
+                    cv2.putText(image, "no click...", (0, 30), cv2.FONT_HERSHEY_PLAIN, 2, (0,0,255), thickness=3)
+                    wr.writerow(features)
                 else:
-                    cv2.putText(image, "'l' to left, 'r' to right", (0, 30), cv2.FONT_HERSHEY_PLAIN, 2, (0, 0, 255), thickness=3)
+                    cv2.putText(image, "'l' to left, 'r' to right, 'z' to standard", (0, 30), cv2.FONT_HERSHEY_PLAIN, 2, (0, 0, 255), thickness=3)
 
         # 화면 키우는부분 (나중에 이부분 삭제)
         #image = cv2.resize(image, dsize=(0, 0), fx=1.5, fy=1.5, interpolation=cv2.INTER_LINEAR)
