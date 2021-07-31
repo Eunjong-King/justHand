@@ -1,7 +1,12 @@
 import cv2
 import mediapipe as mp
-from win32api import GetSystemMetrics, SetCursorPos
+from win32api import GetSystemMetrics, SetCursorPos, mouse_event
+from win32con import MOUSEEVENTF_LEFTDOWN as mld
+from win32con import MOUSEEVENTF_LEFTUP as mlu
+from win32con import MOUSEEVENTF_RIGHTDOWN as mrd
+from win32con import MOUSEEVENTF_RIGHTUP as mru
 from math import sqrt, atan, sin, cos, tan, degrees
+import joblib
 
 def calculate_vector(INDEX_MCP, INDEX_TIP):
     # 원공간에서 벡터 (내가 오른쪽 위를 가르키면 (+,+), 왼쪽
@@ -48,6 +53,27 @@ def change_space(vector, length):
     altitude = HEIGHT - altitude
     return base, altitude
 
+def drawing(image, hand_landmarks):
+    mp_drawing.draw_landmarks(image, hand_landmarks, mp_hands.HAND_CONNECTIONS)
+    tip_x = int(640 * hand_landmarks.landmark[8].x)
+    tip_y = int(480 * hand_landmarks.landmark[8].y)
+    mcp_x = int(640 * hand_landmarks.landmark[5].x)
+    mcp_y = int(480 * hand_landmarks.landmark[5].y)
+    # cv2.line(image, (tip_x, tip_y), (tip_x, tip_y), (0, 0, 255), 10)
+    # cv2.line(image, (mcp_x, mcp_y), (mcp_x, mcp_y), (0, 0, 255), 10)
+    cv2.arrowedLine(image, (mcp_x, mcp_y), (tip_x, tip_y), (0,0,255), thickness=10, tipLength=0.2)
+
+def calculate_distance(dot_a, dot_b):
+    pow_x = (dot_a.x - dot_b.x) ** 2
+    pow_y = (dot_a.y - dot_b.y) ** 2
+    return sqrt(pow_x + pow_y)
+
+def righthand_function(hand_landmarks, kn):
+    distance_4_12 = calculate_distance(hand_landmarks.landmark[12], hand_landmarks.landmark[4])
+    distance_16_20 = calculate_distance(hand_landmarks.landmark[16], hand_landmarks.landmark[20])
+    features = [distance_4_12, distance_16_20]
+    print(kn.predict([features]))
+
 def move_mouse(base, altitude):
     #moveTo(base, altitude)
     SetCursorPos((int(base), int(altitude)))
@@ -57,7 +83,7 @@ mp_hands = mp.solutions.hands
 WIDTH = GetSystemMetrics(0)
 HEIGHT = GetSystemMetrics(1)
 print(WIDTH, HEIGHT)
-
+righthand_model = joblib.load('./files/righthand_model.pkl')
 cap = cv2.VideoCapture(0)
 with mp_hands.Hands(min_detection_confidence=0.5,
                     min_tracking_confidence=0.999,
@@ -80,12 +106,12 @@ with mp_hands.Hands(min_detection_confidence=0.5,
             for one_hand, hand_landmarks in zip(two_hands, results.multi_hand_landmarks):
                 base, altitude = calculate_vector(hand_landmarks.landmark[5], hand_landmarks.landmark[8])
                 move_mouse(base, altitude)
-
                 # print(one_hand.classification[0].label, end=" // ")
-                #mp_drawing.draw_landmarks(image, hand_landmarks, mp_hands.HAND_CONNECTIONS)
+                # drawing(image, hand_landmarks)
+                righthand_function(hand_landmarks, righthand_model)
         # 화면 키우는부분 (나중에 이부분 삭제)
         #image = cv2.resize(image, dsize=(0, 0), fx=1.5, fy=1.5, interpolation=cv2.INTER_LINEAR)
-        cv2.imshow('MediaPipe Hands', image)
+        cv2.imshow('mouse and keyboard', image)
         if cv2.waitKey(5) & 0xFF == 27:
             break
 
