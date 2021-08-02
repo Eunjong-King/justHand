@@ -72,7 +72,18 @@ def righthand_function(hand_landmarks, kn):
     distance_4_12 = calculate_distance(hand_landmarks.landmark[12], hand_landmarks.landmark[4])
     distance_16_20 = calculate_distance(hand_landmarks.landmark[16], hand_landmarks.landmark[20])
     features = [distance_4_12, distance_16_20]
-    print(kn.predict([features]))
+    return kn.predict([features])[0]
+
+def click_mouse(right_list):
+    label = max(right_list)
+    if label == 'z':
+        pass
+    elif label == 'r':
+        mouse_event(mrd, 0, 0)
+        mouse_event(mru, 0, 0)
+    else:
+        mouse_event(mld, 0, 0)
+        mouse_event(mlu, 0, 0)
 
 def move_mouse(base, altitude):
     #moveTo(base, altitude)
@@ -85,6 +96,7 @@ HEIGHT = GetSystemMetrics(1)
 print(WIDTH, HEIGHT)
 righthand_model = joblib.load('./files/righthand_model.pkl')
 cap = cv2.VideoCapture(0)
+right_list = []
 with mp_hands.Hands(min_detection_confidence=0.5,
                     min_tracking_confidence=0.999,
                     max_num_hands=1
@@ -104,11 +116,17 @@ with mp_hands.Hands(min_detection_confidence=0.5,
             two_hands = results.multi_handedness
             # 손이 2개 이상일 때, one_hand와 hand_landmarks가 같은 손을 return함
             for one_hand, hand_landmarks in zip(two_hands, results.multi_hand_landmarks):
-                base, altitude = calculate_vector(hand_landmarks.landmark[5], hand_landmarks.landmark[8])
-                move_mouse(base, altitude)
-                # print(one_hand.classification[0].label, end=" // ")
-                # drawing(image, hand_landmarks)
-                righthand_function(hand_landmarks, righthand_model)
+                if one_hand.classification[0].label == "Right":
+                    base, altitude = calculate_vector(hand_landmarks.landmark[5], hand_landmarks.landmark[8])
+                    move_mouse(base, altitude)
+                    # drawing(image, hand_landmarks)
+                    right_list.append(righthand_function(hand_landmarks, righthand_model))
+                    if len(right_list) > 10:
+                        click_mouse(right_list)
+                        right_list = []
+                else:
+                    print("Left")
+
         # 화면 키우는부분 (나중에 이부분 삭제)
         #image = cv2.resize(image, dsize=(0, 0), fx=1.5, fy=1.5, interpolation=cv2.INTER_LINEAR)
         cv2.imshow('mouse and keyboard', image)
