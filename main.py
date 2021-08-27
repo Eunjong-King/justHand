@@ -9,7 +9,9 @@ from math import sqrt, atan, sin, cos, tan, degrees
 import joblib
 import numpy as np
 import math
-from files.unicode import join_jamos
+from collections import Counter
+import pyautogui
+import pyperclip
 
 def calculate_vector(INDEX_MCP, INDEX_TIP):
     # 원공간에서 벡터 (내가 오른쪽 위를 가르키면 (+,+), 왼쪽
@@ -71,7 +73,7 @@ def calculate_distance(dot_a, dot_b):
     pow_y = (dot_a.y - dot_b.y) ** 2
     return sqrt(pow_x + pow_y)
 
-def righthand_function(hand_landmarks, kn):
+def lefthand_function(hand_landmarks, kn):
     distance_4_12 = calculate_distance(hand_landmarks.landmark[12], hand_landmarks.landmark[4])
     distance_16_20 = calculate_distance(hand_landmarks.landmark[16], hand_landmarks.landmark[20])
     features = [distance_4_12, distance_16_20]
@@ -105,44 +107,18 @@ def get_label():
     d23 = math.sqrt((d8.x * WIDTH - d12.x * WIDTH) ** 2 + (d8.y * HEIGHT - d12.y * HEIGHT) ** 2)
     d34 = math.sqrt((d16.x * WIDTH - d12.x * WIDTH) ** 2 + (d16.y * HEIGHT - d12.y * HEIGHT) ** 2)
     feature_list.append(d23 / d34 - 1)
+    feature_list.append((max_y - min_y) / (max_x - min_x) - 1)
     feature_list = np.round(feature_list, decimals=5)
-    C = dic[left_model.predict([feature_list])[0]]
+    C = label_char[righthand_model.predict([feature_list])[0]]
 
     return C
 
-def lefthand_function(ch, previous_ch, my_word):
-    if ch == previous_ch:
-        return my_word, ch
-    # 무조건 전에 입력한거랑 달라야함 => ㄱ인식됐는데 다음 할게 헷갈리면 ㄱ만 200번 입력되는 대참사 막기 위함
-    else:
+def righthand_function(ch, previous_ch):
         # ch가 자음일 때
-        if ch in ja:
-            # previous_ch도 자음이라서 만약에 합쳐질 수 있는 경우 ex) ㄱ + ㅅ => ㄳ
-            for pre, now, res in merge_ja:
-                if pre == previous_ch and now == ch:
-                    my_word = my_word[:-1] + res
-                    return my_word, res
-            # 일반적인 경우
-            my_word += ch
-            return my_word, ch
-
-        # ch가 모음일 때
-        elif ch in mo:
-            # ㅗ + ㅏ => ㅘ 처럼 합쳐지는 경우
-            if previous_ch in mo:
-                for pre, now, res in merge_mo:
-                    if pre == previous_ch and now == ch:
-                        my_word = my_word[:-1] + res
-                        return my_word, res
-            # ㄱ -> ㅏ -> ㄱ -> ㅅ -> ㅏ 인경우 "갃ㅏ"가 아닌 "각사"가되야함
-            elif previous_ch in np.array(merge_ja)[:, 2]:
-                for pre, now, res in merge_ja:
-                    if res == previous_ch:
-                        my_word = my_word[:-1] + pre + now + ch
-                        return my_word, ch
-            # 아무것도 아닌 경우
-            my_word += ch
-            return my_word, ch
+        if ch in ja or ch in mo:
+            pyperclip.copy(ch)
+            pyautogui.hotkey('ctrl', 'v')
+            return ch
 
         # ch가 특수기호일 때
         else:
@@ -150,18 +126,20 @@ def lefthand_function(ch, previous_ch, my_word):
             if ch == '1':
                 if previous_ch in ssang:
                     # 다행히도 쌍자음의 유니코드는 그냥 자음의 +1이다
-                    my_word = my_word[:-1] + chr(ord(previous_ch) + 1)
+                    pyautogui.press('backspace')
+                    pyperclip.copy(chr(ord(previous_ch) + 1))
+                    pyautogui.hotkey('ctrl', 'v')
             elif ch == '2':
                 pass
             elif ch == '3':
-                my_word = my_word[:-1]
+                pyautogui.press('backspace')
             elif ch == '4':
-                my_word += ' '
+                pyautogui.press(' ')
 
-            return my_word, ch
+            return ch
 
-def click_mouse(right_list):
-    label = max(right_list)
+def click_mouse(left_list):
+    label = Counter(left_list).most_common()[0][0]
     if label == 'z':
         pass
     elif label == 'r':
@@ -172,37 +150,29 @@ def click_mouse(right_list):
         mouse_event(mlu, 0, 0)
 
 def move_mouse(base, altitude):
-    #moveTo(base, altitude)
     SetCursorPos((int(base), int(altitude)))
 
 
 dot_list = [4, 8, 12, 14, 16, 18, 20]
-dic = {'q':'ㅂ', 'w':'ㅈ', 'e':'ㄷ', 'r':'ㄱ', 't':'ㅅ', 'y':'ㅛ', 'u':'ㅕ', 'i':'ㅑ', 'o':'ㅐ', 'p':'ㅔ',
-       'a':'ㅁ', 's':'ㄴ', 'd':'ㅇ', 'f':'ㄹ', 'g':'ㅎ', 'h':'ㅗ', 'j':'ㅓ', 'k':'ㅏ', 'l':'ㅣ',
-       'z':'ㅋ', 'x':'ㅌ', 'c':'ㅊ', 'v':'ㅍ', 'b':'ㅠ', 'n':'ㅜ', 'm':'ㅡ',
-       '1':'1', '2':'2', '3':'3', '4':'4'}
+label_char = ['ㄱ','ㄴ','ㄷ','ㄹ','ㅁ','ㅂ','ㅅ','ㅇ','ㅈ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ',
+              'ㅏ','ㅑ','ㅓ','ㅕ','ㅗ','ㅛ','ㅜ','ㅠ','ㅡ','ㅣ','ㅐ','ㅒ','ㅔ','ㅖ','ㅢ','ㅚ','ㅟ',
+              '1','2','3','4']
 ja = ['ㄱ','ㄴ','ㄷ','ㄹ','ㅁ','ㅂ','ㅅ','ㅇ','ㅈ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ']
 mo = ['ㅏ','ㅑ','ㅓ','ㅕ','ㅗ','ㅛ','ㅜ','ㅠ','ㅡ','ㅣ','ㅐ','ㅒ','ㅔ','ㅖ','ㅢ','ㅚ','ㅟ']
-merge_mo = [['ㅗ', 'ㅏ', 'ㅘ'], ['ㅗ', 'ㅐ', 'ㅙ'], ['ㅜ', 'ㅓ', 'ㅝ'], ['ㅜ', 'ㅔ', 'ㅞ']]
 ssang = ['ㄱ','ㄷ','ㅂ','ㅅ','ㅈ']
-merge_ja = [['ㄱ', 'ㅅ', 'ㄳ'], ['ㄴ', 'ㅈ', 'ㄵ'], ['ㄴ', 'ㅎ', 'ㄶ'], ['ㄹ', 'ㄱ', 'ㄺ'], ['ㄹ', 'ㅁ', 'ㄻ'],
-        ['ㄹ', 'ㅂ', 'ㄼ'], ['ㄹ', 'ㅅ', 'ㄽ'], ['ㄹ', 'ㅌ', 'ㄾ'], ['ㄹ', 'ㅍ', 'ㄿ'], ['ㄹ', 'ㅎ', 'ㅀ'],
-        ['ㅂ', 'ㅅ', 'ㅄ']]
-left_model = joblib.load('files/lefthand_model.pkl')
+righthand_model = joblib.load('right/Right-model.pkl')
 mp_drawing = mp.solutions.drawing_utils
 mp_hands = mp.solutions.hands
 WIDTH = GetSystemMetrics(0)
 HEIGHT = GetSystemMetrics(1)
-print(WIDTH, HEIGHT)
-righthand_model = joblib.load('./files/righthand_model.pkl')
+lefthand_model = joblib.load('left/Left-model.pkl')
 cap = cv2.VideoCapture(0)
 right_list = []
 left_list = []
-my_word = ''
 previous_ch = ''
 with mp_hands.Hands(min_detection_confidence=0.5,
                     min_tracking_confidence=0.999,
-                    max_num_hands=1
+                    max_num_hands=2
                     ) as hands:
     while cap.isOpened():
         success, image = cap.read()
@@ -219,25 +189,22 @@ with mp_hands.Hands(min_detection_confidence=0.5,
             two_hands = results.multi_handedness
             # 손이 2개 이상일 때, one_hand와 hand_landmarks가 같은 손을 return함
             for one_hand, hand_landmarks in zip(two_hands, results.multi_hand_landmarks):
-                if one_hand.classification[0].label == "Right":
+                if one_hand.classification[0].label == "Left":
                     base, altitude = calculate_vector(hand_landmarks.landmark[5], hand_landmarks.landmark[8])
                     move_mouse(base, altitude)
-                    # drawing(image, hand_landmarks)
-                    right_list.append(righthand_function(hand_landmarks, righthand_model))
-                    if len(right_list) > 10:
-                        click_mouse(right_list)
-                        right_list = []
-                else:
-                    C = get_label()
-                    left_list.append(C)
-                    if len(left_list) > 30:
-                        ch = max(left_list)
-                        my_word, previous_ch = lefthand_function(ch, previous_ch, my_word)
-                        print(join_jamos(my_word))
+                    left_list.append(lefthand_function(hand_landmarks, lefthand_model))
+                    if len(left_list) > 10:
+                        click_mouse(left_list)
                         left_list = []
+                if one_hand.classification[0].label == "Right":
+                    C = get_label()
+                    if previous_ch != C:
+                        right_list.append(C)
+                        if len(right_list) > 30:
+                            ch = Counter(right_list).most_common()[0][0]
+                            previous_ch = righthand_function(ch, previous_ch)
+                            right_list = []
 
-        # 화면 키우는부분 (나중에 이부분 삭제)
-        #image = cv2.resize(image, dsize=(0, 0), fx=1.5, fy=1.5, interpolation=cv2.INTER_LINEAR)
         cv2.imshow('mouse and keyboard', image)
         if cv2.waitKey(5) & 0xFF == 27:
             break
